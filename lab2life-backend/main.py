@@ -29,7 +29,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://lab2life-frontendd.vercel.app",
+        "https://lab2life-ai.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
