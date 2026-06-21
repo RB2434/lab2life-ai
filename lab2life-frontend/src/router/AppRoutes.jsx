@@ -13,8 +13,12 @@ import NotFound from "../pages/NotFound";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import DoctorList from "../pages/DoctorList";
-import Subscription from "../pages/Subscription";
 import MyReports from "../pages/MyReports";
+
+// ✅ Doctor Pages
+import DoctorLogin from "../pages/DoctorLogin";
+import DoctorRegister from "../pages/DoctorRegister";
+import DoctorDashboard from "../pages/DoctorDashboard";
 
 function Layout({ children }) {
   return (
@@ -30,6 +34,8 @@ export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
+
+        {/* Home */}
         <Route
           path="/"
           element={
@@ -39,6 +45,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Upload Report */}
         <Route
           path="/upload"
           element={
@@ -48,6 +55,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Report Summary */}
         <Route
           path="/summary"
           element={
@@ -57,6 +65,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Ask Doctor */}
         <Route
           path="/ask-doctor"
           element={
@@ -66,6 +75,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Doctors */}
         <Route
           path="/doctors"
           element={
@@ -75,6 +85,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Doctor Category List */}
         <Route
           path="/doctors/:type"
           element={
@@ -84,15 +95,7 @@ export default function AppRoutes() {
           }
         />
 
-        <Route
-          path="/subscription"
-          element={
-            <Layout>
-              <Subscription />
-            </Layout>
-          }
-        />
-
+        {/* Patient Login */}
         <Route
           path="/login"
           element={
@@ -102,6 +105,7 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Patient Register */}
         <Route
           path="/register"
           element={
@@ -110,14 +114,48 @@ export default function AppRoutes() {
             </Layout>
           }
         />
+
+        {/* My Reports */}
         <Route
-            path="/my-reports"
-            element={
-              <Layout>
-                <MyReports />
-              </Layout>
-            }
-          />
+          path="/my-reports"
+          element={
+            <Layout>
+              <MyReports />
+            </Layout>
+          }
+        />
+
+        {/* Doctor Login */}
+        <Route
+          path="/doctor-login"
+          element={
+            <Layout>
+              <DoctorLogin />
+            </Layout>
+          }
+        />
+
+        {/* Doctor Register */}
+        <Route
+          path="/doctor-register"
+          element={
+            <Layout>
+              <DoctorRegister />
+            </Layout>
+          }
+        />
+
+        {/* Doctor Dashboard */}
+        <Route
+          path="/doctor-dashboard"
+          element={
+            <Layout>
+              <DoctorDashboard />
+            </Layout>
+          }
+        />
+
+        {/* 404 */}
         <Route
           path="*"
           element={
@@ -126,6 +164,7 @@ export default function AppRoutes() {
             </Layout>
           }
         />
+
       </Routes>
     </BrowserRouter>
   );

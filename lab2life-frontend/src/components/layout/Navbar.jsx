@@ -14,8 +14,8 @@ export default function Navbar() {
 
   const token = sessionStorage.getItem("lab2life_token");
   const patientName = sessionStorage.getItem("lab2life_patient_name");
-  const isSubscribed =
-    sessionStorage.getItem("lab2life_subscription") === "true";
+  // const isSubscribed =
+  //   sessionStorage.getItem("lab2life_subscription") === "true";
 
   const handleLogout = () => {
     sessionStorage.clear();
@@ -57,8 +57,12 @@ export default function Navbar() {
           <NavLink to="/doctors" className={navLinkClass}>
             Doctors
           </NavLink>
-          <NavLink to="/subscription" className={navLinkClass}>
-            Subscription
+          <NavLink to="/doctor-login" className={navLinkClass}>
+            Doctor Login
+          </NavLink>
+
+          <NavLink to="/doctor-register" className={navLinkClass}>
+            Doctor Register
           </NavLink>
 
           {/* 🔥 Profile Section */}
@@ -85,14 +89,14 @@ export default function Navbar() {
       {patientName}
     </p>
 
-    <p className="text-sm text-gray-400">Subscription</p>
+    {/* <p className="text-sm text-gray-400">Subscription</p>
     <p
       className={`font-semibold mb-4 ${
         isSubscribed ? "text-green-400" : "text-red-400"
       }`}
     >
       {isSubscribed ? "Active" : "Not Subscribed"}
-    </p>
+    </p> */}
 
     {/* ✅ NEW BUTTON */}
     <button
@@ -106,13 +110,13 @@ export default function Navbar() {
     </button>
 
     <button
-      onClick={() => {
-        setOpen(false);
-        navigate("/subscription");
-      }}
-      className="w-full mb-3 text-sm bg-white/10 py-2 rounded-lg hover:bg-white/20 transition"
-    >
-      Manage Subscription
+  onClick={() => {
+    setOpen(false);
+    navigate("/doctor-login");
+  }}
+  className="w-full mb-3 text-sm bg-white/10 py-2 rounded-lg hover:bg-white/20 transition"
+>
+      Doctor Portal
     </button>
 
     <button

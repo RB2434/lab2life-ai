@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
+import API from "../api/labApi";
 export default function DoctorList() {
   const navigate = useNavigate();
   const { type } = useParams();
@@ -13,12 +13,7 @@ export default function DoctorList() {
         specialization: "General Medicine",
         hospital: "Ruby Hall Clinic, Pune",
       },
-      {
-        name: "Dr. Neha Patil",
-        degree: "MBBS, DNB",
-        specialization: "Primary Care Physician",
-        hospital: "Jehangir Hospital, Pune",
-      },
+      
     ],
     cardiologist: [
       {
@@ -27,20 +22,10 @@ export default function DoctorList() {
         specialization: "Heart Specialist",
         hospital: "Sahyadri Hospital, Pune",
       },
-      {
-        name: "Dr. Priya Deshmukh",
-        degree: "MBBS, MD, DM",
-        specialization: "Cardiology",
-        hospital: "Aditya Birla Hospital, Pune",
-      },
+      
     ],
     diabetologist: [
-      {
-        name: "Dr. Kunal Mehta",
-        degree: "MBBS, Fellowship in Diabetology",
-        specialization: "Diabetes Specialist",
-        hospital: "Apollo Clinic, Pune",
-      },
+      
       {
         name: "Dr. Sneha Joshi",
         degree: "MBBS, MD",
@@ -55,20 +40,10 @@ export default function DoctorList() {
         specialization: "Blood Disorders",
         hospital: "KEM Hospital, Pune",
       },
-      {
-        name: "Dr. Anjali Verma",
-        degree: "MBBS, MD",
-        specialization: "Clinical Hematology",
-        hospital: "Noble Hospital, Pune",
-      },
+      
     ],
     nephrologist: [
-      {
-        name: "Dr. Vikram Nair",
-        degree: "MBBS, DM Nephrology",
-        specialization: "Kidney Specialist",
-        hospital: "Deenanath Mangeshkar Hospital, Pune",
-      },
+      
       {
         name: "Dr. Pooja Singh",
         degree: "MBBS, MD",
@@ -83,42 +58,43 @@ export default function DoctorList() {
         specialization: "Hormone Specialist",
         hospital: "Sancheti Hospital, Pune",
       },
-      {
-        name: "Dr. Kavita More",
-        degree: "MBBS, MD",
-        specialization: "Endocrinology",
-        hospital: "Aundh Hospital, Pune",
-      },
+      
     ],
   };
 
   const doctors = doctorData[type] || [];
 
-  const handleConsult = (doctor) => {
-    const token = sessionStorage.getItem("lab2life_token");
-    const subscribed = sessionStorage.getItem("lab2life_subscription") === "true";
+ const handleConsult = async (doctor) => {
+  const token = sessionStorage.getItem("lab2life_token");
 
-    if (!token) {
-      navigate("/login", {
-        state: {
-          from: `/doctors/${type}`,
+  if (!token) {
+    navigate("/login");
+    return;
+  }
+
+  try {
+    const response = await API.post(
+      "/request-doctor",
+      {
+        doctor_name: doctor.name
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      });
-      return;
-    }
+      }
+    );
 
-    if (!subscribed) {
-      navigate("/subscription", {
-        state: {
-          doctor,
-          type,
-        },
-      });
-      return;
-    }
-
-    alert(`Consultation booked with ${doctor.name}`);
-  };
+    alert("Request sent to doctor successfully");
+    navigate("/");
+  } catch (error) {
+    console.error(error);
+    alert(
+      error.response?.data?.detail ||
+      "Please upload a report first before consulting a doctor."
+    );
+  }
+};
 
   return (
     <div className="pt-32 px-4 md:px-10 pb-16">
