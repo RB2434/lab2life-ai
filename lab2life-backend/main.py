@@ -14,7 +14,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
-import razorpay
+# import razorpay
 
 # -------------------- Load Environment Variables --------------------
 load_dotenv()
@@ -44,13 +44,13 @@ if not GROQ_API_KEY:
 client = Groq(api_key=GROQ_API_KEY)
 
 # -------------------- RAZORPAY --------------------
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+# RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+# RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
-if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-    raise ValueError("Razorpay keys not found in environment variables")
+# if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+#     raise ValueError("Razorpay keys not found in environment variables")
 
-razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+# razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 # -------------------- SECURITY --------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "lab2life-secret-key")
@@ -98,9 +98,24 @@ class Patient(Base):
     phone = Column(String(10), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    is_subscribed = Column(String(10), default="false")
+    # is_subscribed = Column(String(10), default="false")
 
     reports = relationship("Report", back_populates="patient")
+# ==========================
+# DOCTOR TABLE
+# ==========================
+class Doctor(Base):
+    __tablename__ = "doctors"
+
+    id = Column(Integer, primary_key=True)
+
+    full_name = Column(String)
+
+    email = Column(String, unique=True)
+
+    password_hash = Column(String)
+
+    specialization = Column(String)
 
 class Report(Base):
     __tablename__ = "reports"
@@ -120,6 +135,20 @@ class Report(Base):
 
     patient = relationship("Patient", back_populates="reports")
 
+class DoctorRequest(Base):
+    __tablename__ = "doctor_requests"
+
+    id = Column(Integer, primary_key=True)
+
+    patient_id = Column(Integer)
+
+    report_id = Column(Integer)
+
+    doctor_id = Column(Integer)      # NEW
+
+    status = Column(String(50), default="Pending")
+
+    doctor_comment = Column(Text, nullable=True)
 
 Base.metadata.create_all(bind=engine)
 
@@ -143,9 +172,22 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class DoctorRegisterRequest(BaseModel):
+    full_name: str
+    specialization: str
+    email: EmailStr
+    password: str
 
-class CreateSubscriptionOrderRequest(BaseModel):
-    plan: str
+
+class DoctorLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class DoctorRequestCreate(BaseModel):
+    doctor_name: str
+
+# class CreateSubscriptionOrderRequest(BaseModel):
+#     plan: str
 
 
 # -------------------- DATABASE HELPERS --------------------
@@ -197,7 +239,74 @@ def get_current_patient(
 
     return patient
 
+def get_current_patient_optional(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+):
+    if not credentials:
+        return None
 
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        patient_id = payload.get("sub")
+
+        return (
+            db.query(Patient)
+            .filter(Patient.id == int(patient_id))
+            .first()
+        )
+
+    except:
+        return None
+
+
+# ==========================
+# ADD THIS BELOW
+# ==========================
+
+def get_current_doctor(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+):
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Doctor login required"
+        )
+
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        doctor_id = payload.get("sub")
+
+        doctor = (
+            db.query(Doctor)
+            .filter(Doctor.id == int(doctor_id))
+            .first()
+        )
+
+        if not doctor:
+            raise HTTPException(
+                status_code=401,
+                detail="Doctor not found"
+            )
+
+        return doctor
+
+    except:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid doctor token"
+        )
 # ✅ ADD THIS FUNCTION HERE 👇
 def get_current_patient_optional(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -450,6 +559,37 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
     return {"message": "Patient registered successfully"}
 
+@app.post("/doctor-register")
+def doctor_register(
+    data: DoctorRegisterRequest,
+    db: Session = Depends(get_db)
+):
+
+    existing = (
+        db.query(Doctor)
+        .filter(Doctor.email == data.email)
+        .first()
+    )
+
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Doctor already exists"
+        )
+
+    doctor = Doctor(
+        full_name=data.full_name,
+        specialization=data.specialization,
+        email=data.email,
+        password_hash=hash_password(data.password)
+    )
+
+    db.add(doctor)
+    db.commit()
+
+    return {
+        "message": "Doctor registered successfully"
+    } 
 
 @app.post("/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
@@ -464,76 +604,110 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     "access_token": token,
     "token_type": "bearer",
     "full_name": patient.full_name,
-    "is_subscribed": patient.is_subscribed,
 }
 
-
-@app.post("/create-subscription-order")
-def create_subscription_order(
-    data: CreateSubscriptionOrderRequest,
-    current_patient: Patient = Depends(get_current_patient),
+@app.post("/doctor-login")
+def doctor_login(
+    data: DoctorLoginRequest,
+    db: Session = Depends(get_db)
 ):
-    try:
-        if data.plan == "monthly":
-            amount = 19900  # ₹199 in paise
-        else:
-            raise HTTPException(status_code=400, detail="Invalid plan")
 
-        order_data = {
-            "amount": amount,
-            "currency": "INR",
-            "receipt": f"sub_{current_patient.id}_{uuid.uuid4().hex[:6]}",
-            "notes": {
-                "patient_id": str(current_patient.id),
-                "plan": data.plan,
-                "name": current_patient.full_name,
-            },
-        }
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.email == data.email)
+        .first()
+    )
 
-        order = razorpay_client.order.create(data=order_data)
+    if not doctor:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
 
-        return {
-            "order_id": order["id"],
-            "amount": order["amount"],
-            "currency": order["currency"],
-            "key": RAZORPAY_KEY_ID,
-            "name": current_patient.full_name,
-            "email": current_patient.email,
-            "phone": current_patient.phone,
-        }
+    if not verify_password(
+        data.password,
+        doctor.password_hash
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
 
-    except Exception as e:
-        print("Razorpay Error:", e)
-        raise HTTPException(status_code=500, detail="Payment creation failed")
+    token = create_access_token(
+        {"sub": str(doctor.id)}
+    )
 
-@app.post("/verify-payment")
-def verify_payment(
-    payment_data: dict,
-    current_patient: Patient = Depends(get_current_patient),
-    db: Session = Depends(get_db),
-):
-    try:
-        razorpay_order_id = payment_data.get("razorpay_order_id")
-        razorpay_payment_id = payment_data.get("razorpay_payment_id")
-        razorpay_signature = payment_data.get("razorpay_signature")
+    return {
+        "access_token": token,
+        "doctor_name": doctor.full_name
+    }
 
-        if not razorpay_order_id or not razorpay_payment_id or not razorpay_signature:
-            raise HTTPException(status_code=400, detail="Missing payment details")
+# @app.post("/create-subscription-order")
+# def create_subscription_order(
+#     data: CreateSubscriptionOrderRequest,
+#     current_patient: Patient = Depends(get_current_patient),
+# ):
+#     try:
+#         if data.plan == "monthly":
+#             amount = 19900  # ₹199 in paise
+#         else:
+#             raise HTTPException(status_code=400, detail="Invalid plan")
 
-        razorpay_client.utility.verify_payment_signature({
-            "razorpay_order_id": razorpay_order_id,
-            "razorpay_payment_id": razorpay_payment_id,
-            "razorpay_signature": razorpay_signature,
-        })
+#         order_data = {
+#             "amount": amount,
+#             "currency": "INR",
+#             "receipt": f"sub_{current_patient.id}_{uuid.uuid4().hex[:6]}",
+#             "notes": {
+#                 "patient_id": str(current_patient.id),
+#                 "plan": data.plan,
+#                 "name": current_patient.full_name,
+#             },
+#         }
 
-        current_patient.is_subscribed = "true"
-        db.commit()
+#         order = razorpay_client.order.create(data=order_data)
 
-        return {"message": "Payment verified and subscription activated successfully"}
+#         return {
+#             "order_id": order["id"],
+#             "amount": order["amount"],
+#             "currency": order["currency"],
+#             "key": RAZORPAY_KEY_ID,
+#             "name": current_patient.full_name,
+#             "email": current_patient.email,
+#             "phone": current_patient.phone,
+#         }
 
-    except Exception as e:
-        print("Payment Verification Error:", e)
-        raise HTTPException(status_code=400, detail="Payment verification failed")
+#     except Exception as e:
+#         print("Razorpay Error:", e)
+#         raise HTTPException(status_code=500, detail="Payment creation failed")
+
+# @app.post("/verify-payment")
+# def verify_payment(
+#     payment_data: dict,
+#     current_patient: Patient = Depends(get_current_patient),
+#     db: Session = Depends(get_db),
+# ):
+#     try:
+#         razorpay_order_id = payment_data.get("razorpay_order_id")
+#         razorpay_payment_id = payment_data.get("razorpay_payment_id")
+#         razorpay_signature = payment_data.get("razorpay_signature")
+
+#         if not razorpay_order_id or not razorpay_payment_id or not razorpay_signature:
+#             raise HTTPException(status_code=400, detail="Missing payment details")
+
+#         razorpay_client.utility.verify_payment_signature({
+#             "razorpay_order_id": razorpay_order_id,
+#             "razorpay_payment_id": razorpay_payment_id,
+#             "razorpay_signature": razorpay_signature,
+#         })
+
+#         current_patient.is_subscribed = "true"
+#         db.commit()
+
+#         return {"message": "Payment verified and subscription activated successfully"}
+
+#     except Exception as e:
+#         print("Payment Verification Error:", e)
+#         raise HTTPException(status_code=400, detail="Payment verification failed")
 # -------------------- PUBLIC UPLOAD ROUTE (SAVED ONLY FOR LOGGED-IN USERS) --------------------
 @app.post("/upload-report")
 async def upload_report(
@@ -618,8 +792,14 @@ async def upload_report(
 
             db.add(report)
             db.commit()
+            db.refresh(report)
 
-        return analysis
+        analysis["report_id"] = report.id if current_patient else None
+
+        return {
+    **analysis,
+    "report_id": report.id if current_patient else None
+}
 
     except Exception as e:
         print("Upload Error:", e)
@@ -677,6 +857,137 @@ def get_my_reports(
         })
 
     return {"reports": result}
+
+@app.post("/request-doctor")
+def request_doctor(
+    data: DoctorRequestCreate,
+    current_patient: Patient = Depends(get_current_patient),
+    db: Session = Depends(get_db),
+):
+
+    latest_report = (
+        db.query(Report)
+        .filter(Report.patient_id == current_patient.id)
+        .order_by(Report.id.desc())
+        .first()
+    )
+
+    if not latest_report:
+        raise HTTPException(
+            status_code=404,
+            detail="No report found"
+        )
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.full_name == data.doctor_name)
+        .first()
+    )
+
+    if not doctor:
+        raise HTTPException(
+            status_code=404,
+            detail="Doctor not found"
+        )
+    existing_request = (
+    db.query(DoctorRequest)
+    .filter(
+        DoctorRequest.patient_id == current_patient.id,
+        DoctorRequest.report_id == latest_report.id,
+        DoctorRequest.status == "Pending"
+    )
+    .first()
+    )
+
+    if existing_request:
+        return {
+        "message": "Request already sent"
+    }
+
+    request = DoctorRequest(
+    patient_id=current_patient.id,
+    report_id=latest_report.id,
+    doctor_id=doctor.id,
+    status="Pending"
+)
+
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    return {
+            "message": "Doctor request submitted successfully"
+}
+
+@app.get("/doctor/pending-reports")
+def doctor_pending_reports(
+    db: Session = Depends(get_db)
+):
+    requests = db.query(DoctorRequest).all()
+
+    result = []
+
+    for req in requests:
+
+        patient = (
+            db.query(Patient)
+            .filter(Patient.id == req.patient_id)
+            .first()
+        )
+
+        report = (
+            db.query(Report)
+            .filter(Report.id == req.report_id)
+            .first()
+        )
+
+        result.append({
+            "report_id": report.id if report else 0,
+            "file_name": report.file_name if report else "",
+            "patient_name": patient.full_name if patient else "Unknown",
+            "verification_status": req.status,
+            "summary": report.summary if report else "",
+            "health_score": report.health_score if report else 0,
+        })
+
+    return {
+        "reports": result
+    }
+
+@app.get("/doctor-pending-requests")
+def doctor_pending_requests(
+    db: Session = Depends(get_db)
+):
+
+    requests = db.query(DoctorRequest).all()
+
+    result = []
+
+    for req in requests:
+
+        patient = (
+            db.query(Patient)
+            .filter(Patient.id == req.patient_id)
+            .first()
+        )
+
+        report = (
+            db.query(Report)
+            .filter(Report.id == req.report_id)
+            .first()
+        )
+
+        result.append({
+            "request_id": req.id,
+            "patient_name": patient.full_name if patient else "Unknown",
+            "report_id": req.report_id,
+            "doctor_type": req.doctor_type,
+            "status": req.status,
+            "summary": report.summary if report else ""
+        })
+
+    return result
+
 
 
 # -------------------- ROOT TEST ROUTE --------------------
